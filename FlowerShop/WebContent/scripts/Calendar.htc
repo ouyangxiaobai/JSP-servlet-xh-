@@ -1,0 +1,958 @@
+﻿<!--
+//  描述			: 日历控间(自带日期验证)
+//  版本			: 1.0
+//  作者			: 玻璃*杯(HapTear@hotmail.com)
+//  最新更新		: 2003-6-25
+//  备注			:本控件参考了"梅花雨"控件,在此感谢"梅花雨"控件的作者和公司的同事
+// mic@tencent.com 做过一些修改, 增加几个方法
+/*
+主调用函数是 showDiv(objthis,type,oDocument)[objthis]是控件输出的控件或控件名，type是日期的显示类型，[oDocument]是输出控件所在的Document对象，可省略，缺省为控件所在的Document对象：
+<div id="as" style="behavior:url(calendar.htc)">
+一、<input id='xx'><input type=button onclick="as.showDiv('xx',1)"> 
+二、<input onfocus="as.showDiv(this,1)"> 
+*/
+-->
+<PUBLIC:COMPONENT>
+
+<PUBLIC:PROPERTY NAME="DataBgColor"	  />
+<PUBLIC:PROPERTY NAME="TimeBgColor"   />
+<PUBLIC:PROPERTY NAME="HeadOverColor" />
+<PUBLIC:PROPERTY NAME="HeadColor"	  />
+<PUBLIC:PROPERTY NAME="WeekBgcolor"   />
+<PUBLIC:PROPERTY NAME="WeekColor"     />
+<PUBLIC:PROPERTY NAME="DayBgColor"    />
+<PUBLIC:PROPERTY NAME="DayColor"	  />
+<PUBLIC:PROPERTY NAME="DayselectColor"/>
+<PUBLIC:PROPERTY NAME="DayNowColor"   />
+<PUBLIC:PROPERTY NAME="FiltColor"     />
+<PUBLIC:PROPERTY NAME="BorderColor"   />
+<PUBLIC:PROPERTY NAME="buttonStyle"   />
+<PUBLIC:PROPERTY NAME="NoneDayBgColor"   />
+<PUBLIC:PROPERTY NAME="CanMove"   />
+<PUBLIC:PROPERTY NAME="IsDefault"   />
+<PUBLIC:ATTACH EVENT="oncontentready"   ONEVENT="Load()"   />
+<PUBLIC:ATTACH EVENT="onclick" ONEVENT="element_onclick()" />
+<PUBLIC:ATTACH EVENT="onblur" ONEVENT="element_onblur()" />
+<PUBLIC:ATTACH EVENT="onfocus" ONEVENT="element_onfocus()" />
+<PUBLIC:ATTACH EVENT="onkeydown" ONEVENT="element_onkeydown()" />
+<PUBLIC:METHOD NAME="showDiv" />
+<PUBLIC:METHOD NAME="f_show" />
+<PUBLIC:METHOD NAME="CheckDataTime" />
+	   
+<PUBLIC:EVENT  NAME="onhidden"       id="evt_onHidden" />	   
+	   
+<SCRIPT LANGUAGE="JScript">
+window.onerror = function fnNoOp() {return true; };
+
+//========================================================
+//类取Obj的位置属性(obj可以在其他容器中,容器也可以scroll),用法posLib.getTop(obj)
+  var posLib = {
+    getClientLeft:    function (el) {
+      var r = el.getBoundingClientRect();
+      return r.left - this.getBorderLeftWidth(this.getCanvasElement(el));
+    },
+
+    getClientTop:    function (el) {
+      var r = el.getBoundingClientRect();
+      return r.top - this.getBorderTopWidth(this.getCanvasElement(el));
+    },
+
+    getLeft:    function (el) {
+      return this.getClientLeft(el) + this.getCanvasElement(el).scrollLeft;
+    },
+
+    getTop:    function (el) {
+      return this.getClientTop(el) + this.getCanvasElement(el).scrollTop;
+    },
+
+    getInnerLeft:    function (el) {
+      return this.getLeft(el) + this.getBorderLeftWidth(el);
+    },
+
+    getInnerTop:    function (el) {
+      return this.getTop(el) + this.getBorderTopWidth(el);
+    },
+
+    getWidth:    function (el) {
+      return el.offsetWidth;
+    },
+
+    getHeight:    function (el) {
+      return el.offsetHeight;
+    },
+
+    getCanvasElement:    function (el) {
+      var doc = el.ownerDocument || el.document;    // IE55 bug
+      if (doc.compatMode == "CSS1Compat")
+        return doc.documentElement;
+      else
+        return doc.body;
+    },
+
+    getBorderLeftWidth:    function (el) {
+      return el.clientLeft;
+    },
+
+    getBorderTopWidth:    function (el) {
+      return el.clientTop;
+    },
+
+    getScreenLeft:    function (el) {
+      var doc = el.ownerDocument || el.document;    // IE55 bug
+      var w = doc.parentWindow;
+      return w.screenLeft + this.getBorderLeftWidth(this.getCanvasElement(el)) + this.getClientLeft(el);
+    },
+
+    getScreenTop:    function (el) {
+      var doc = el.ownerDocument || el.document;    // IE55 bug
+      var w = doc.parentWindow;
+      return w.screenTop  + this.getClientTop(el);//+ this.getBorderTopWidth(this.getCanvasElement(el))
+    }
+  }
+
+//===================== 属性设定部分 =====================
+var DataBgColor		="#C8E3FF";		//日期选择的(整各Tr)背景颜色
+var TimeBgColor		="#C8E3FF";		//时间选择的(整各Tr)背景颜色
+
+var HeadOverColor	="#FFD700";		//日期和时间的Over颜色(单个Td)
+var HeadColor		="#C8E3FF";		//日期和时间的颜色(单个Td)
+							   
+var WeekBgcolor		="#0080FF";		//星期的背景颜色
+
+var WeekColor		="#ffffff";		//星期的字体颜色
+
+
+var DayBgColor		="#ffffff";		//日期的背景颜色
+
+var DayColor		="#000000";		//日期的字体颜色
+
+var DayselectColor	="#ffd9cd";		//日期选中的颜色
+
+var DayFont			="arial";
+var DayFontSize		="9pt";
+
+var DayNowColor		="#99cccc";		//当天的日期颜色
+
+var	NoneDayBgColor	="#F0F0F0";		//非当月日期的背景颜色
+var NoneDayFont		="arial";		//非当月日期的字体
+var NoneDayFontSize	="9pt";			//非当月日期的字体大小	
+
+
+var FiltColor		="Silver";		//风格条的颜色
+var BorderColor		="#0080FF";		//边框的颜色
+
+
+var buttonStyle		="background-color: #FFF7E7;border:1px solid #78acff;font-size:12.8px;cursor:hand;FONT-SIZE: 9pt;font-family:宋体;";//按钮的Css
+
+var MaxYear			=2100;			//最大的年份
+var MinYear			=1900;			//最小的年份
+
+var CanMove			="true";			//是否允许拖动
+//======================================================
+
+//===================== 私有变量部分 =====================
+var Yearinner						//年的下拉列表的容器
+
+var Monthinner						//月的下拉列表的容器
+
+var Hoursinner						//时的下拉列表的容器
+
+var Minuteinner						//分的下拉列表的容器
+
+
+var YearSelect						//年的下拉列表
+var MonthSelect						//月的下拉列表
+var HoursSelect						//时的下拉列表
+var MinutersSelect					//分的下拉列表
+
+var YearId							//年的td
+var MonthId							//月的td
+var HoursId							//时的td
+var MinutersId						//分的td
+
+var TimesID							//时间的Tr ,由Types来控制TimesId的显示或隐藏
+
+var	MoveID							//控制移动的元素(就是显示星期一,二的那个Tr)
+var flagMoveStart					//开始移动Iframe
+var	MoveIDX							//Iframe的起始X
+var	MoveIDY							//Iframe的起始Y
+
+var ifr;							//Iframe
+var types;							//显示的日期类型	  1为短日期,2为长日期
+var gaDayCell= new Array()			// 用于存放列的天数
+
+var outObject="";					//当前操作的文本框
+
+var outDate=new Date();	
+var id="";//存放对象的日期
+
+var showDataTime                                      //显示日期时间
+var oPopup;
+var VersionInfo="xx"        //版本信息 
+var oldDate;
+//=======================================================
+
+//==========================事件==========================
+
+function Htc_OnMouseOver()
+{
+	//window.status =VersionInfo;
+}
+
+function Htc_OnClick()//onclick事件
+{ 
+  Yearinner.style.display="none";
+  Monthinner.style.display="none";
+  Hoursinner.style.display="none";
+  Minuteinner.style.display="none";
+
+  var obj=this.document.parentWindow;//为什么此处不能使用"obj=ifr"了;
+  var e = obj.event.srcElement;
+  if (e.tagName == "TD") 
+  {	 
+	 switch (e.name)
+	 {
+	 case "Year":
+		  YearinnerHtml();		break;		  
+	 case "Month":
+		  MonthinnerHtml();		break;
+	 case "Hours":
+		  HoursinnerHtml();		break;
+	 case "Minuters":
+		  MinutersinnerHtml();   	break;
+	 case "Days":
+		 getData(e); oPopup.hide();	break;
+	 }		
+  }
+ 
+  if (e.tagName=="INPUT")
+  {
+	 switch (e.name)
+	 {
+	 case "PreMonth":		 
+		  NextMonth(-1);break;		  
+	 case "NextMonth":
+		  NextMonth(1);	break;
+	 case "PreYear":
+		  NextYear(-1);	break;
+	 case "NextYear":
+		  NextYear(1);	break;
+	 case "Today":
+		  ToDay(); oPopup.hide();	break;
+     case "Clear":
+          ToClear();oPopup.hide();break;
+	 }	 	 
+  }
+  
+}
+//========================== 事件结束 =========================
+
+//========================= 生成Ifram ========================
+function Load()
+{
+  	oPopup = window.createPopup();
+  	var today=new Date();
+  	 if(element.readOnly==false)
+  	 {
+  	    if(element.value==""&&element.disabled==false&&element.contentEditable=="false")
+  			element.value=(today.getYear())+"-"+(today.getMonth()+1)+"-"+(today.getDate());
+  	 }
+  	 else
+  	 {
+		//if(element.value==""&&element.disabled==false)
+  		//	element.value=(today.getYear())+"-"+(today.getMonth()+1)+"-"+(today.getDate());
+  	 }
+  	if ( this.IsDefault == "true" && element.value=="")
+  		element.value=(today.getYear())+"-"+(today.getMonth()+1)+"-"+(today.getDate());
+	setBorderStyle(element);  	
+}
+
+function setBorderStyle(obj)
+{
+	obj.style.background = "";
+	if(obj.disabled)
+		obj.style.borderBottom = "#999999 1px solid";
+	else 
+		obj.style.borderBottom = "#7F9DB9 1px solid";
+	obj.style.borderTop = "#999999 1px solid";
+	obj.style.borderLeft = "#999999 1px solid";
+	obj.style.borderRight = "#999999 1px solid";
+}
+
+function element_onfocus()
+{
+	element.select();
+	element.style.borderColor = "#333333"; 
+	element.style.border = "#7F9DB9 1px solid";
+	element.style.background = "White";
+}
+
+function element_onclick()
+{
+	oldDate = element.value;
+	showDiv(element, 1);
+}
+
+//失去焦点时检查数据有效性
+function element_onblur()
+{
+	CheckDataTime(outObject.value);
+	element.style.borderColor = "";
+	setBorderStyle(element);
+	
+	if((element.value != "") && (oldDate != element.value))
+		if(element.dopostback == "yes")
+			__doPostBack(element.id, '');
+}
+
+function element_onkeydown()
+{
+	switch(event.keyCode)
+	{
+		case 13:
+			element.blur();
+			oPopup.hide();
+			break;
+	}
+}
+
+function CreateStruct()
+{
+var str ="<div style=\"z-index:9999;position: absolute; left:0; top:0;\"> "+ 
+	"<span id=Yearinner   style=\"z-index: 9999;position: absolute;top: 4;  left: 21;display: none\"></span> "+ 
+	"<span id=Monthinner  style=\"z-index: 9999;position: absolute;top: 4;  left: 78;display: none\"></span> "+ 
+	"<span id=Hoursinner  style=\"z-index: 9999;position: absolute;top: 29; left: 29;display: none\"></span> "+ 
+	"<span id=Minuinner	  style=\"z-index: 9999;position: absolute;top: 29; left: 77;display: none\"></span> "+ 
+	"<table border=\"0\" cellspacing=\"0\" cellpadding=\"2\" bgcolor=\""+BorderColor+"\">\n "+ 
+	  "<tr>\n "+ 
+		"<td>\n "+ 
+			"<table border=\"0\" cellspacing=\"1\" cellpadding=\"2\" bgcolor=\"Silver\">\n "+ 
+				"<tr>"+
+					"<td colspan=\"7\" bgcolor=\""+DataBgColor+"\" align=\"CENTER\" >\n "+ //日期选择
+						"<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" ><tr>\n "+ 
+							"<td width=40><input type='button' style='font-size: 11px; height: 20px;"+buttonStyle+"' title=\"向前翻 1 年\" value=\"&lt;&lt;\" name=\"PreYear\"><input type='button' style='font-size: 11px; height: 20px;"+buttonStyle+"' title=\"向前翻 1 月\" value=\"&lt;\" name=\"PreMonth\"></td>\n "+ 
+							"<td width=58 align='center' bgcolor=\""+HeadColor+"\" style=\"font-size:12px;cursor:hand\" onmouseover=\"style.backgroundColor=\'"+HeadOverColor+"\'\" onmouseout=\"style.backgroundColor=\'"+HeadColor+"\'\" name=\"Year\" title=\"点击这里选择年份\">"+outDate.getFullYear()+" 年</td>\n "+ 
+							"<td width=46 align='center' bgcolor=\""+HeadColor+"\" style=\"font-size:12px;cursor:hand\" onmouseover=\"style.backgroundColor=\'"+HeadOverColor+"\'\" onmouseout=\"style.backgroundColor=\'"+HeadColor+"\'\" name=\"Month\"  title=\"点击这里选择月份\">"+addZero((outDate.getMonth()+1))+" 月</td>\n "+ 
+							"<td width=40 align='right'><input type='button' style='font-size: 11px; height: 20px;"+buttonStyle+"' title=\"向后翻 1 月\" value=\"&gt;\" name=\"NextMonth\"><input type='button' style='font-size: 11px; height: 20px;"+buttonStyle+"' title=\"向后翻 1 年\" value=\"&gt;&gt;\" name=\"NextYear\"></td>\n "+ 
+						"</tr></table>\n "+ 
+					"</td>"+		
+				"</tr>\n "+ 
+				"<tr  "+((types==1)?"style='display:none;'":"")+" align=\"CENTER\" width=\"100%\">"+
+					"<td colspan=\"7\" bgcolor=\""+TimeBgColor+"\">"+ //时间选择
+						"<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\"><tr style=\"height: 20px;\">\n "+ 
+						"<td style=\"font-size:12px\" nowrap>时 间: </td>\n "+ 
+						"<td width=50 align='center' bgcolor=\""+HeadColor+"\" style=\"font-size:12px;cursor:hand\" onmouseover=\"style.backgroundColor=\'"+HeadOverColor+"\'\" onmouseout=\"style.backgroundColor=\'"+HeadColor+"\'\"  name=\"Hours\" title=\"点击这里选择小时\">"+addZero(outDate.getHours())+" 时</td>\n "+ 
+						"<td width=50 align='center' bgcolor=\""+HeadColor+"\" style=\"font-size:12px;cursor:hand\" onmouseover=\"style.backgroundColor=\'"+HeadOverColor+"\'\" onmouseout=\"style.backgroundColor=\'"+HeadColor+"\'\" name=\"Minuters\" title=\"点击这里选择分钟\">"+addZero(outDate.getMinutes())+" 分</td>\n "+ 
+						"</tr></table>\n "+ 
+					"</td>"+
+				"</tr>\n "+ 
+				"<TR><td colspan=\"7\" align=\"CENTER\" valign=\"TOP\"></TD></TR>\n "+ 
+				"<TR bgcolor=\""+WeekBgcolor+"\" name=\"Move\">\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">日</td>\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">一</td>\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">二</td>\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">三</td>\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">四</td>\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">五</td>\n "+ 
+					"<td width='20' align='center' style=\"font-size:12px;color:"+WeekColor+"\">六</td>\n "+ 
+				"</TR>\n "+ 
+				"<TR><td colspan=\"7\" align=\"CENTER\" valign=\"TOP\"></TD></TR>\n "+ 
+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+				"<TR BGCOLOR='"+DayBgColor+"' ALIGN='right'><td></td><td></td><td></td><td></td><td></td><td></td><td></td></TR>"+
+
+
+				"<tr><td colspan=\"7\" bgcolor=\""+DataBgColor+"\" width=\"100%\">\n "+ //当前日期选择
+					"<table border=\"0\" cellspacing=\"0\" cellpadding=\"0\" width=\"100%\"><tr>\n "+ 
+					"<td align='center' width=30><input type='button' style='font-size: 12px; height: 20px;"+buttonStyle+"' title=\"当前日期\" value=\"今天\" name=\"Today\" ></td>\n "+ 	
+					"<td align='center' bgcolor='#ffffff' style='font-size: 12px;'></td>\n "+
+					"<td align='center' width=30><input type='button' style='font-size: 12px; height: 20px;"+buttonStyle+"' title=\"清除日期\" value=\"清除\" name=\"Clear\" ></td>\n "+ 
+				"</tr></table>\n "+ 
+				"</td></tr></table>\n "+ 
+			"</TD>" +
+		"</TR>"+
+	"</TABLE>"+
+"</div>";
+
+		oPopup.document.body.innerHTML=str;
+		var obj=oPopup.document.body;		
+		
+		Yearinner	= obj.children[0].children[0];//年的选择列表Obj
+		Monthinner	= obj.children[0].children[1];//月的选择列表Obj
+		Hoursinner	= obj.children[0].children[2];//时的选择列表Obj
+		Minuteinner	= obj.children[0].children[3];//分的选择列表Obj
+
+		var obj		=obj.children[0].children[4].rows[0].cells[0].children[0];
+
+		TimesID		=obj.rows[1];
+		MoveID		=obj.rows[3]; 	
+		/*
+		if (CanMove.toLowerCase ()=="true")
+		{	
+			MoveID.attachEvent("onmousedown",DrogStart);
+			MoveID.attachEvent("onmouseup",DrogEnd);
+			MoveID.attachEvent("onmousemove",Drog);
+			MoveID.style.cursor="Move";
+		}
+		*/
+		YearId		=obj.rows[0].cells[0].children[0].rows[0].cells[1]; 
+		MonthId		=obj.rows[0].cells[0].children[0].rows[0].cells[2];   
+		HoursId		=obj.rows[1].cells[0].children[0].rows[0].cells[1];   
+		MinutersId	=obj.rows[1].cells[0].children[0].rows[0].cells[2];
+	        	
+		  for (row=5; row < 11; row++)
+			for (cell=0; cell < 7; cell++)
+				{					
+					gaDayCell[((row-5)*7) + cell] = obj.rows[row].cells[cell];//生成所有日期的Obj					
+				}
+				
+	   showDataTime = obj.rows[12].cells[0].children[0].rows[0].cells[1];
+}
+
+function YearinnerHtml()//年份的下拉框
+{
+  //年份的下拉框
+  if (Yearinner.childNodes.length>0)
+  {
+	Yearinner.removeChild(YearSelect);
+  }
+	
+  var obj=oPopup.document;
+  TempSelect = obj.createElement("SELECT");
+  
+  for (i=MinYear ; i <= MaxYear; i++)
+  {
+    e = obj.createElement("OPTION");
+    e.text =i;
+    e.value=i;	
+    TempSelect.options.add(e);
+  }
+
+  TempSelect.options[(outDate.getFullYear()- MinYear)].selected = true;//选中当前年份
+  YearSelect=TempSelect;
+
+  Yearinner.style.left	=posLib.getLeft(YearId);
+  Yearinner.style.top	=posLib.getTop(YearId);
+  Yearinner.style.width=posLib.getWidth(YearId);
+
+  Yearinner.appendChild(YearSelect);//把Select插入到Yearinner
+  Yearinner.style.display="block";
+  YearSelect.attachEvent("onchange",YearSelectOnChange); //设置onchange事件
+}
+
+function YearSelectOnChange()
+{
+	var years=YearSelect.options[YearSelect.selectedIndex].value;	
+	Yearinner.style.display="none";
+	
+	outDate.setFullYear(years);
+	Yearinner.removeChild(YearSelect);
+	YearId.innerHTML=years +" 年";		
+	FillInCells();
+}
+
+function MonthinnerHtml()//月份的下拉框
+{
+  if (Monthinner.childNodes.length>0)
+  {
+	Monthinner.removeChild(MonthSelect);
+  }
+ 
+  var obj=oPopup.document ;
+  TempSelect =obj.createElement("SELECT")
+  
+  for (var i=0 ; i < 12; i++)
+  {
+    e = obj.createElement("OPTION");
+    e.text =((i+1).toString().length==1)?"0" + (i+1):(i+1);
+	e.value=i;
+    TempSelect.options.add(e);
+  }
+  TempSelect.options[outDate.getMonth()].selected = true;
+  MonthSelect=TempSelect;
+
+  Monthinner.style.left		=posLib.getLeft(MonthId); 
+  Monthinner.style.top		=posLib.getTop(MonthId);  
+  Monthinner.style.width	=posLib.getWidth(MonthId);
+
+  Monthinner.appendChild(MonthSelect);
+  Monthinner.style.display	="block";
+  MonthSelect.attachEvent("onchange",MonthSelectOnChange) //设置onchange事件
+}
+
+function MonthSelectOnChange()
+{
+	var month=MonthSelect.options[MonthSelect.selectedIndex].value;	
+	Monthinner.style.display="none";
+	outDate.setMonth(month);
+	Monthinner.removeChild(MonthSelect);
+	month++;
+	MonthId.innerHTML=addZero(month) + " 月";	
+	FillInCells();
+}
+
+function HoursinnerHtml()//时的下拉框
+
+{
+  if (Hoursinner.childNodes.length>0)
+  {
+	Hoursinner.removeChild(HoursSelect);
+  }		
+  var obj=oPopup.document;
+  TempSelect =obj.createElement("SELECT");
+  
+  for (i=1 ; i < 24; i++)
+  {
+    e = obj.createElement("OPTION");
+    e.text =(i.toString().length==1)?"0" + i:i;
+	e.value=i;
+    TempSelect.options.add(e);
+  }
+  TempSelect.options[(outDate.getHours()-1)].selected = true;
+  HoursSelect=TempSelect;
+
+  Hoursinner.style.left		=posLib.getLeft(HoursId);   
+  Hoursinner.style.top		=posLib.getTop(HoursId);    
+  Hoursinner.style.width	=posLib.getWidth(HoursId);  
+
+  Hoursinner.appendChild(HoursSelect);
+  Hoursinner.style.display="block" ;
+  HoursSelect.attachEvent("onchange",HoursSelectOnChange);//设置onchange事件  
+}
+
+function HoursSelectOnChange()
+{
+	var Hours=HoursSelect.options[HoursSelect.selectedIndex].value ;
+	Hoursinner.style.display="none";
+	outDate.setHours(Hours);
+	Hoursinner.removeChild(HoursSelect);	
+	HoursId.innerHTML=addZero(Hours) + " 时";	 	
+	FillInCells();
+}
+
+function MinutersinnerHtml()//分的下拉框
+
+{
+  if (Minuteinner.childNodes.length>0)
+  {
+	Minuteinner.removeChild(MinutersSelect);
+  } 
+  var obj=oPopup.document;
+  TempSelect =obj.createElement("SELECT");
+  
+  for (i=0 ; i < 60; i++)
+  {
+    e = obj.createElement("OPTION");
+    e.text =(i.toString().length==1)?"0" + i:i;;
+	e.value=i;
+    TempSelect.options.add(e);
+  }
+  TempSelect.options[(outDate.getMinutes())].selected = true;
+  MinutersSelect=TempSelect;
+
+  Minuteinner.style.left	=posLib.getLeft(MinutersId); 
+  Minuteinner.style.top		=posLib.getTop(MinutersId);  
+  Minuteinner.style.width	=posLib.getWidth(MinutersId);
+
+  Minuteinner.appendChild(MinutersSelect);
+  Minuteinner.style.display	="block";
+  MinutersSelect.attachEvent("onchange",MinutersSelectOnChange);//设置onchange事件
+}
+
+function MinutersSelectOnChange()
+{
+	var Minuters=MinutersSelect.options[MinutersSelect.selectedIndex].value;
+	outDate.setMinutes(Minuters);
+	Minuteinner.style.display="none";
+	Minuteinner.removeChild(MinutersSelect);
+	MinutersId.innerHTML=addZero(Minuters) + " 分";	
+	FillInCells();
+}
+
+//填充日期
+function FillInCells()
+{	
+	var montdDays = new Array(31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
+	var dayNames = new Array("星期日","星期一","星期二","星期三","星期四","星期五","星期六");
+	var monthNames = new Array("1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月");
+	
+	//检查年份
+
+	if (outDate.getFullYear() < MinYear) outDate.setFullYear(MinYear);
+	if (outDate.getFullYear() > MaxYear) outDate.setFullYear(MaxYear);
+
+	//判断是否为润月
+
+	if (((outDate.getFullYear() % 4 == 0) && (outDate.getFullYear() % 100 != 0)) || (outDate.getFullYear() % 400 == 0)) montdDays[1] = 29;
+	//取得当前月份的最大日期
+
+	var nDays = montdDays[outDate.getMonth()];
+		
+	//var today= new Date(outDate.getYear(),outDate.getMonth()-1,Days);
+	var startDay = (new Date(outDate.getFullYear(),outDate.getMonth(),1)).getDay();//取得一号是星期几
+
+
+	if (startDay < 1) startDay += 7	
+	var CurrMonth=outDate.getMonth();
+	var CurrYear=outDate.getFullYear();
+	for (i=startDay;i<nDays+startDay;i++ )//当前月的显示
+	{
+		gaDayCell[i].innerText		=i-startDay+1;
+		gaDayCell[i].style.cursor	="hand";
+		gaDayCell[i].title			=CurrYear +"-" + (CurrMonth+1) + "-" + (i-startDay+1);
+		gaDayCell[i].bgColor		=DayBgColor;//td的背景背景  DayBgColor
+		gaDayCell[i].style.color	=DayColor;//字体的颜色
+
+		gaDayCell[i].style.fontSize	=DayFontSize;
+		gaDayCell[i].style.fontFamily	=DayFont;
+
+
+		if ((i-startDay+1)==(new Date()).getDate())
+		{
+			gaDayCell[i].bgColor		=DayNowColor;			
+		}
+		if ((i-startDay+1)==outDate.getDate())
+		{
+			gaDayCell[i].bgColor		=DayselectColor;
+		}
+
+		gaDayCell[i].name			="Days";
+		gaDayCell[i].stypename			="cday";
+		gaDayCell[i].day			= i-startDay+1
+		gaDayCell[i].month			= CurrMonth
+		gaDayCell[i].year			= CurrYear
+		
+	}
+
+	 CurrYear	= (outDate.getMonth() == 11)  ? outDate.getFullYear() + 1	: outDate.getFullYear()
+	 CurrMonth  = (outDate.getMonth() == 11)  ? 0							: outDate.getMonth() + 1 
+
+	for (i=nDays+startDay;i<42;i++ )//下一月的显示
+	{
+		var j=i-(nDays+startDay)+1;
+		gaDayCell[i].innerText		=j;
+		gaDayCell[i].style.cursor	="hand";	//默认的鼠标
+
+		gaDayCell[i].name			="Days";
+		gaDayCell[i].stypename			="nday";
+		gaDayCell[i].title			=CurrYear +"-" + (CurrMonth+1) + "-" + (j);
+		gaDayCell[i].bgColor		=NoneDayBgColor;//非当月的背景
+
+		gaDayCell[i].day			= j
+		gaDayCell[i].month			= CurrMonth
+		gaDayCell[i].year			= CurrYear
+		gaDayCell[i].style.fontSize	=NoneDayFontSize;
+		gaDayCell[i].style.fontFamily	=NoneDayFont;
+	}
+
+	
+	CurrYear	= (outDate.getMonth() == 0)  ? outDate.getFullYear() - 1	: outDate.getFullYear()
+    CurrMonth	= (outDate.getMonth() == 0)  ? 11							: outDate.getMonth() - 1 
+	nDays		= montdDays[CurrMonth];//上一月的显示
+	for (i=nDays-startDay+1;i<=nDays;i++ )
+	{
+		var j=i-nDays+startDay-1;
+		gaDayCell[j].innerText		=i;
+		gaDayCell[j].style.cursor	="hand";	//默认的鼠标
+
+		gaDayCell[j].name			="Days";
+		gaDayCell[j].stypename			="pday";
+		gaDayCell[j].title			=CurrYear +"-" + (CurrMonth+1) + "-" + i;
+		gaDayCell[j].bgColor		=NoneDayBgColor;//非当月的背景
+		//gaDayCell[j].style.fontWeight 	="bold"
+
+		gaDayCell[j].day			= i
+		gaDayCell[j].month			= CurrMonth
+		gaDayCell[j].year			= CurrYear
+		gaDayCell[j].style.fontSize	=NoneDayFontSize;
+		gaDayCell[j].style.fontFamily	=NoneDayFont;
+	}
+
+	GetTime();
+}
+
+function ToDay()//当前日期
+{
+	outDate=new Date();
+	//getData(outDate);
+	if (types==1)//日期
+	{
+		outObject.value=outDate.getFullYear() + "-" + addZero(outDate.getMonth()+1) + "-" +addZero(outDate.getDate());
+	}
+	else//日期和时间
+
+	{
+		outObject.value=outDate.getFullYear() + "-" + addZero(outDate.getMonth()+1) + "-" +addZero(outDate.getDate()) + " " + addZero(outDate.getHours()) + ":" + addZero(outDate.getMinutes());
+	}
+}
+
+function NextYear(step)//下一年
+
+{
+	outDate.setFullYear(CheckYears(outDate.getFullYear()+step));
+	YearId.innerHTML=outDate.getFullYear()+ " 年";
+	FillInCells();
+}
+
+function CheckYears(years)//检测年份是否在规定的范围内
+{
+	years=(years<MinYear)?MinYear:years;
+	years=(years>MaxYear)?MaxYear:years;
+	return years;
+}
+
+function NextMonth(step)//下个月
+{
+	var months=outDate.getMonth();
+	var Years=outDate.getFullYear();
+	months+=step
+	if (months>11)
+	{
+		Years+=1;
+		months=0;
+	}
+	else if (months<0)
+	{
+		Years+=-1;
+		months=11;
+	}
+	outDate.setYear(CheckYears(Years));
+	outDate.setMonth(months);
+
+	YearId.innerHTML=Years+ " 年";
+	MonthId.innerHTML=addZero((months+1))+ " 月";
+	FillInCells();
+}
+
+function ToClear() //清除时间
+{
+  outObject.value = "";  
+}
+
+function GetTime() //取得时间加到TextBox中赋值
+
+{    
+       var sDataTime;
+       if (types==1)//日期
+	{
+           sDataTime=outDate.getFullYear() + "-" + addZero((outDate.getMonth()+1)) + "-" +addZero(outDate.getDate());
+	}
+	else//日期和时间
+
+	{
+           sDataTime=outDate.getFullYear() + "-" + addZero((outDate.getMonth()+1)) + "-" +addZero(outDate.getDate()) + " " + addZero(outDate.getHours()) + ":" + addZero(outDate.getMinutes());
+         }
+         
+	// outObject.value = sDataTime;
+	 showDataTime.innerHTML = sDataTime;
+}
+
+function getData(strData)//往TextBox中赋值
+{
+	var sDay = strData.day;
+	var stypename = strData.stypename;
+
+	var sDateTime;
+	if (stypename == "pday")
+	  sDateTime = outDate.getMonth();
+	else if(stypename == "nday")
+	   sDateTime = outDate.getMonth()+2;
+	else
+	   sDateTime = outDate.getMonth()+1;
+	   
+	var sYear= outDate.getFullYear();
+	if (sDateTime>12)
+	{
+		sYear+=1;
+		sDateTime=1;
+	}
+	else if (sDateTime<1)
+	{
+		sYear+=-1;
+		sDateTime=12;
+	}
+   
+	if (types==1)//日期
+	{
+		outObject.value=sYear + "-" + addZero(sDateTime) + "-" +addZero(sDay);
+	}
+	else//日期和时间
+
+	{
+		outObject.value=sYear + "-" + addZero(sDateTime) + "-" +addZero(sDay) + " " + addZero(outDate.getHours()) + ":" + addZero(outDate.getMinutes());
+	}
+
+	//outDate.setDate(strData);
+	//ifr.style.display="none";
+}
+
+function addZero(i)//添加0
+{
+	return ((i.toString().length==1)?"0"+i:i);
+}
+
+//objthis控件的依附Obj  type日期的显示类型
+function f_show(objthis,type,doPostBack)//显示日期控件
+{
+	showDiv(objthis, type);
+	if(doPostBack == true)
+	{
+		__doPostBack(objthis,'');
+	}
+}
+
+function showDiv(objthis,type, oDocument)//显示日期控件
+{
+	types=type;
+	
+	if (typeof(objthis)=="object")
+	{
+		outObject=objthis;
+	}
+	else
+	{
+		outObject=element.document.all[objthis];
+	}
+	 
+	if (outObject.value=="")
+	{
+		outDate=new Date();
+	}
+	else
+	{
+		CheckDataTime(outObject.value);
+	}
+	  
+	if (typeof(YearId)!="object")
+	{
+		CreateStruct()//生成结构
+	}	
+	
+	writeTd();//显示日期和时间在td中
+
+	FillInCells(); 
+	//填充日期
+    var iLeft = posLib.getClientLeft(outObject) + posLib.getCanvasElement(outObject).clientLeft;
+	var iTop = posLib.getClientTop(outObject)+outObject.offsetHeight + posLib.getCanvasElement(outObject).clientTop;
+//  var iLeft = posLib.getScreenLeft(outObject);
+//	var iTop = posLib.getScreenTop(outObject)+outObject.offsetHeight;
+	var iHeigth
+	if (type == 1)
+	  iHeigth = 200;
+	else
+	  iHeigth = 227;
+	  
+	var oPopupHtml = oPopup.document.body;
+	oPopup.document.body.onclick = Htc_OnClick;
+	oPopup.document.body.onunload = oPopup_Hidden;
+	if (oDocument == null || oDocument.tagName != null)
+	  oDocument = element.document;
+	oPopup.show(iLeft,iTop,180,iHeigth, oDocument.body);
+}
+
+function oPopup_Hidden(){
+   var oEvent = document.createEventObject();
+   evt_onHidden.fire(oEvent);
+}
+
+function writeTd()//显示日期和时间在td中 防止在更改了年份,但是点击空白隐藏,再显示时就是显示改变后的年年份了,但其实应该是未改变的年份
+{
+	TimesID.style.display	=((types==1)?"none":"block");//是否显示时间
+	YearId.innerHTML		=outDate.getFullYear() + " 年";
+	MonthId.innerHTML		=addZero(outDate.getMonth()+1) + " 月";
+	HoursId.innerHTML		=addZero(outDate.getHours()) + " 时"; 
+	MinutersId.innerHTML	=addZero(outDate.getMinutes()) + " 分";	
+	//隐藏Select框
+
+	Yearinner.style.display		="none";	
+	Monthinner.style.display	="none";
+	Hoursinner.style.display	="none";	
+	Minuteinner.style.display	="none";
+}	  
+
+function checkReg(strData,reg)
+{
+	var r = strData.match(reg); 
+	if(r!=null)
+	{
+		r[2]=r[2]-1; 
+		if (r[6]!="")// 日期 20:20:41
+		{
+			var d= new Date(r[1],r[2],r[3],r[4],r[5],r[6]); 
+			if(d.getFullYear()==r[1] && d.getMonth()==r[2] && d.getDate()==r[3] && d.getHours()==r[4] && d.getMinutes()==r[5] && d.getSeconds()==r[6]){
+				return d;
+			}
+			else 
+			{
+				return "";
+			}
+		}
+		else if(r[5]!="")// 日期 20:20
+		{
+			var d= new Date(r[1],r[2],r[3],r[4],r[5]); 
+			if(d.getFullYear()==r[1] && d.getMonth()==r[2] && d.getDate()==r[3] && d.getHours()==r[4] && d.getMinutes()==r[5]){
+				return d;
+			}
+			else 
+			{
+				return "";
+			}	
+		}
+		else// 日期
+		{
+			var d= new Date(r[1], r[2],r[3]); 
+			if(d.getFullYear()==r[1] && d.getMonth()==r[2] && d.getDate()==r[3]){
+				return d;
+			}
+			else 
+			{
+				return "";
+			}
+		}
+	}
+	else
+	{
+		return "fasle";
+	}
+}
+
+function check(strData)
+{
+	//2002-11-12 or 2002-11-12 12:20 or 2002-11-12 21:20:20
+	var reg = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s*(\d{1,2}):(\d{1,2}))?(?::(\d{1,2}))?$/; 
+	var TempObj=checkReg(strData,reg)
+	if (typeof(TempObj)=="object") {return TempObj}//2002\11\12
+
+	//2002\11\12 or 2002\11\12 12:20 or 2002\11\12 21:20:20
+	reg = /^(\d{4})\\(\d{1,2})\\(\d{1,2})(?:\s*(\d{1,2}):(\d{1,2}))?(?::(\d{1,2}))?$/; 
+	TempObj=checkReg(strData,reg)
+	if (typeof(TempObj)=="object") {return TempObj}
+
+	//2002年11月12 or 2002年11月12 21:20 or 2002年11月12 21:20:20
+	reg = /^(\d{4})年(\d{1,2})月(\d{1,2}日?)(?:\s*(\d{1,2}):(\d{1,2}))?(?::(\d{1,2}))?$/; 
+	TempObj=checkReg(strData,reg)
+	if (typeof(TempObj)=="object") {return TempObj}	
+	outObject.value="";
+}
+
+function CheckDataTime(strDate)
+{	
+	var TempObj=check(strDate);
+	if (typeof(TempObj)=="object")
+	{
+		outDate=TempObj;
+	}
+	else
+	{ 
+		outObject.value="";
+	}
+}
+
+
+   </SCRIPT>
+</PUBLIC:COMPONENT>
